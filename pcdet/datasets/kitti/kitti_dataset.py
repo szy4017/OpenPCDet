@@ -4,10 +4,15 @@ import pickle
 import numpy as np
 from skimage import io
 
-from . import kitti_utils
-from ...ops.roiaware_pool3d import roiaware_pool3d_utils
-from ...utils import box_utils, calibration_kitti, common_utils, object3d_kitti
-from ..dataset import DatasetTemplate
+# from . import kitti_utils
+# from ...ops.roiaware_pool3d import roiaware_pool3d_utils
+# from ...utils import box_utils, calibration_kitti, common_utils, object3d_kitti
+# from ..dataset import DatasetTemplate
+
+from pcdet.datasets.kitti import kitti_utils
+from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
+from pcdet.utils import box_utils, calibration_kitti, common_utils, object3d_kitti
+from pcdet.datasets import DatasetTemplate
 
 
 class KittiDataset(DatasetTemplate):
@@ -31,6 +36,7 @@ class KittiDataset(DatasetTemplate):
 
         self.kitti_infos = []
         self.include_kitti_data(self.mode)
+        self.num_features = len(self.dataset_cfg.POINT_FEATURE_ENCODING['src_feature_list'])
 
     def include_kitti_data(self, mode):
         if self.logger is not None:
@@ -65,18 +71,23 @@ class KittiDataset(DatasetTemplate):
         assert lidar_file.exists()
         return np.fromfile(str(lidar_file), dtype=np.float32).reshape(-1, 4)
 
+    def get_aug_lidar(self, idx):
+        lidar_file = self.root_split_path / 'velodyne_aug_3.0' / ('%s.bin.npy' % idx)
+        assert lidar_file.exists()
+        return np.load(str(lidar_file)).reshape(-1, 12)
+
     def get_image(self, idx):
         """
+        img_file = self.root_split_path / 'image_2' / ('%s.png' % idx)
+        assert img_file.exists()
+        image = io.imread(img_file)
+        image = image.astype(np.float32)
         Loads image for a sample
         Args:
             idx: int, Sample index
         Returns:
             image: (H, W, 3), RGB Image
         """
-        img_file = self.root_split_path / 'image_2' / ('%s.png' % idx)
-        assert img_file.exists()
-        image = io.imread(img_file)
-        image = image.astype(np.float32)
         image /= 255.0
         return image
 
@@ -153,7 +164,7 @@ class KittiDataset(DatasetTemplate):
         def process_single_scene(sample_idx):
             print('%s sample_idx: %s' % (self.split, sample_idx))
             info = {}
-            pc_info = {'num_features': 4, 'lidar_idx': sample_idx}
+            pc_info = {'num_features': self.num_features, 'lidar_idx': sample_idx}
             info['point_cloud'] = pc_info
 
             image_info = {'image_idx': sample_idx, 'image_shape': self.get_image_shape(sample_idx)}
@@ -200,7 +211,14 @@ class KittiDataset(DatasetTemplate):
                 info['annos'] = annotations
 
                 if count_inside_pts:
-                    points = self.get_lidar(sample_idx)
+                    # points = self.get_lidar(sample_idx)
+                    if self.num_features == 4:
+                        points = self.get_lidar(sample_idx)
+                    elif self.num_features == 12:
+                        points = self.get_aug_lidar(sample_idx)
+                    else:
+                        raise ValueError('The source feature list is mismatched.')
+
                     calib = self.get_calib(sample_idx)
                     pts_rect = calib.lidar_to_rect(points[:, 0:3])
 
@@ -237,7 +255,13 @@ class KittiDataset(DatasetTemplate):
             print('gt_database sample: %d/%d' % (k + 1, len(infos)))
             info = infos[k]
             sample_idx = info['point_cloud']['lidar_idx']
-            points = self.get_lidar(sample_idx)
+            # points = self.get_lidar(sample_idx)
+            if self.num_features == 4:
+                points = self.get_lidar(sample_idx)
+            elif self.num_features == 12:
+                points = self.get_aug_lidar(sample_idx)
+            else:
+                raise ValueError('The source feature list is mismatched.')
             annos = info['annos']
             names = annos['name']
             difficulty = annos['difficulty']
@@ -405,7 +429,14 @@ class KittiDataset(DatasetTemplate):
                 input_dict['road_plane'] = road_plane
 
         if "points" in get_item_list:
-            points = self.get_lidar(sample_idx)
+            # points = self.get_lidar(sample_idx)
+            if self.num_features == 4:
+                points = self.get_lidar(sample_idx)
+            elif self.num_features == 12:
+                points = self.get_aug_lidar(sample_idx)
+            else:
+                raise ValueError('The source feature list is mismatched.')
+
             if self.dataset_cfg.FOV_POINTS_ONLY:
                 pts_rect = calib.lidar_to_rect(points[:, 0:3])
                 fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
@@ -439,27 +470,27 @@ def create_kitti_infos(dataset_cfg, class_names, data_path, save_path, workers=4
 
     print('---------------Start to generate data infos---------------')
 
-    dataset.set_split(train_split)
-    kitti_infos_train = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=True)
-    with open(train_filename, 'wb') as f:
-        pickle.dump(kitti_infos_train, f)
-    print('Kitti info train file is saved to %s' % train_filename)
+    # dataset.set_split(train_split)
+    # kitti_infos_train = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=True)
+    # with open(train_filename, 'wb') as f:
+    #     pickle.dump(kitti_infos_train, f)
+    # print('Kitti info train file is saved to %s' % train_filename)
 
-    dataset.set_split(val_split)
-    kitti_infos_val = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=True)
-    with open(val_filename, 'wb') as f:
-        pickle.dump(kitti_infos_val, f)
-    print('Kitti info val file is saved to %s' % val_filename)
+    # dataset.set_split(val_split)
+    # kitti_infos_val = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=True)
+    # with open(val_filename, 'wb') as f:
+    #     pickle.dump(kitti_infos_val, f)
+    # print('Kitti info val file is saved to %s' % val_filename)
 
-    with open(trainval_filename, 'wb') as f:
-        pickle.dump(kitti_infos_train + kitti_infos_val, f)
-    print('Kitti info trainval file is saved to %s' % trainval_filename)
+    # with open(trainval_filename, 'wb') as f:
+    #     pickle.dump(kitti_infos_train + kitti_infos_val, f)
+    # print('Kitti info trainval file is saved to %s' % trainval_filename)
 
-    dataset.set_split('test')
-    kitti_infos_test = dataset.get_infos(num_workers=workers, has_label=False, count_inside_pts=False)
-    with open(test_filename, 'wb') as f:
-        pickle.dump(kitti_infos_test, f)
-    print('Kitti info test file is saved to %s' % test_filename)
+    # dataset.set_split('test')
+    # kitti_infos_test = dataset.get_infos(num_workers=workers, has_label=False, count_inside_pts=False)
+    # with open(test_filename, 'wb') as f:
+    #     pickle.dump(kitti_infos_test, f)
+    # print('Kitti info test file is saved to %s' % test_filename)
 
     print('---------------Start create groundtruth database for data augmentation---------------')
     dataset.set_split(train_split)
@@ -469,16 +500,29 @@ def create_kitti_infos(dataset_cfg, class_names, data_path, save_path, workers=4
 
 
 if __name__ == '__main__':
-    import sys
-    if sys.argv.__len__() > 1 and sys.argv[1] == 'create_kitti_infos':
-        import yaml
-        from pathlib import Path
-        from easydict import EasyDict
-        dataset_cfg = EasyDict(yaml.safe_load(open(sys.argv[2])))
-        ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
-        create_kitti_infos(
-            dataset_cfg=dataset_cfg,
-            class_names=['Car', 'Pedestrian', 'Cyclist'],
-            data_path=ROOT_DIR / 'data' / 'kitti',
-            save_path=ROOT_DIR / 'data' / 'kitti'
-        )
+    # import sys
+    # if sys.argv.__len__() > 1 and sys.argv[1] == 'create_kitti_infos':
+    #     import yaml
+    #     from pathlib import Path
+    #     from easydict import EasyDict
+    #     dataset_cfg = EasyDict(yaml.safe_load(open(sys.argv[2])))
+    #     ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+    #     create_kitti_infos(
+    #         dataset_cfg=dataset_cfg,
+    #         class_names=['Car', 'Pedestrian', 'Cyclist'],
+    #         data_path=ROOT_DIR / 'data' / 'kitti',
+    #         save_path=ROOT_DIR / 'data' / 'kitti'
+    #     )
+
+    import yaml
+    from pathlib import Path
+    from easydict import EasyDict
+
+    dataset_cfg = EasyDict(yaml.safe_load(open('/data/szy4017/code/OpenPCDet/tools/cfgs/dataset_configs/kitti_aug_dataset.yaml')))
+    ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+    create_kitti_infos(
+        dataset_cfg=dataset_cfg,
+        class_names=['Car', 'Pedestrian', 'Cyclist'],
+        data_path=ROOT_DIR / 'data' / 'kitti_aug',
+        save_path=ROOT_DIR / 'data' / 'kitti_aug'
+    )

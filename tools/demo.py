@@ -13,6 +13,7 @@ except:
 
 import numpy as np
 import torch
+import json
 
 from pcdet.config import cfg, cfg_from_yaml_file
 from pcdet.datasets import DatasetTemplate
@@ -62,11 +63,17 @@ class DemoDataset(DatasetTemplate):
 
 def parse_config():
     parser = argparse.ArgumentParser(description='arg parser')
-    parser.add_argument('--cfg_file', type=str, default='cfgs/kitti_models/second.yaml',
+    # parser.add_argument('--cfg_file', type=str, default=None, help='specify the config for demo')
+    parser.add_argument('--cfg_file', type=str, default='cfgs/kitti_models/centerpoint.yaml',
                         help='specify the config for demo')
-    parser.add_argument('--data_path', type=str, default='demo_data',
+
+    # parser.add_argument('--data_path', type=str, default=None, help='specify the point cloud data file or directory')
+    parser.add_argument('--data_path', type=str, default='../data/kitti/training/velodyne/000008.bin',
                         help='specify the point cloud data file or directory')
-    parser.add_argument('--ckpt', type=str, default=None, help='specify the pretrained model')
+
+    # parser.add_argument('--ckpt', type=str, default=None, help='specify the pretrained model')
+    parser.add_argument('--ckpt', type=str, default='ckpt/checkpoint_epoch_80.pth', help='specify the pretrained model')
+
     parser.add_argument('--ext', type=str, default='.bin', help='specify the extension of your point cloud data file')
 
     args = parser.parse_args()
@@ -80,6 +87,7 @@ def main():
     args, cfg = parse_config()
     logger = common_utils.create_logger()
     logger.info('-----------------Quick Demo of OpenPCDet-------------------------')
+    json_tag = cfg['MODEL']['NAME'] + '-' + cfg['DATA_CONFIG']['DATASET']
     demo_dataset = DemoDataset(
         dataset_cfg=cfg.DATA_CONFIG, class_names=cfg.CLASS_NAMES, training=False,
         root_path=Path(args.data_path), ext=args.ext, logger=logger
@@ -97,13 +105,28 @@ def main():
             load_data_to_gpu(data_dict)
             pred_dicts, _ = model.forward(data_dict)
 
-            V.draw_scenes(
-                points=data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
-                ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
-            )
+            # save point draw info
+            point_draw_dict = dict()
+            if isinstance(data_dict['points'][:, 1:], torch.Tensor):
+                point_draw_dict['points'] = data_dict['points'][:, 1:].cpu().numpy().tolist()
+            if isinstance(pred_dicts[0]['pred_boxes'], torch.Tensor):
+                point_draw_dict['ref_boxes'] = pred_dicts[0]['pred_boxes'].cpu().numpy().tolist()
+            if isinstance(pred_dicts[0]['pred_scores'], torch.Tensor):
+                point_draw_dict['ref_scores'] = pred_dicts[0]['pred_scores'].cpu().numpy().tolist()
+            if isinstance(pred_dicts[0]['pred_labels'], torch.Tensor):
+                point_draw_dict['ref_labels'] = pred_dicts[0]['pred_labels'].cpu().numpy().tolist()
 
-            if not OPEN3D_FLAG:
-                mlab.show(stop=True)
+            json_str = json.dumps(point_draw_dict, indent=4)
+            with open('./demo_json/{}-ID-{}.json'.format(json_tag, idx), 'w') as json_file:
+                json_file.write(json_str)
+            logger.info('Save demo json file in ' + './demo_json/{}-ID-{}.json'.format(json_tag, idx))
+            # V.draw_scenes(
+            #     points=data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
+            #     ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
+            # )
+            #
+            # if not OPEN3D_FLAG:
+            #     mlab.show(stop=True)
 
     logger.info('Demo done.')
 

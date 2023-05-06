@@ -20,12 +20,15 @@ from pcdet.utils import common_utils
 
 def parse_config():
     parser = argparse.ArgumentParser(description='arg parser')
-    parser.add_argument('--cfg_file', type=str, default=None, help='specify the config for training')
+    # parser.add_argument('--cfg_file', type=str, default=None, help='specify the config for training')
+    parser.add_argument('--cfg_file', type=str, default='./cfgs/kitti_models/centerpoint.yaml', help='specify the config for training')
+    # parser.add_argument('--cfg_file', type=str, default='./cfgs/kitti_models/centerpoint_with_data_aug.yaml', help='specify the config for training')
 
     parser.add_argument('--batch_size', type=int, default=None, required=False, help='batch size for training')
     parser.add_argument('--workers', type=int, default=4, help='number of workers for dataloader')
     parser.add_argument('--extra_tag', type=str, default='default', help='extra tag for this experiment')
-    parser.add_argument('--ckpt', type=str, default=None, help='checkpoint to start from')
+    # parser.add_argument('--ckpt', type=str, default=None, help='checkpoint to start from')
+    parser.add_argument('--ckpt', type=str, default='./ckpt/checkpoint_epoch_80.pth', help='checkpoint to start from')
     parser.add_argument('--pretrained_model', type=str, default=None, help='pretrained_model')
     parser.add_argument('--launcher', choices=['none', 'pytorch', 'slurm'], default='none')
     parser.add_argument('--tcp_port', type=int, default=18888, help='tcp port for distrbuted training')

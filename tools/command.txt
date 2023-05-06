@@ -1,0 +1,37 @@
+# Generate the data infos
+python -m pcdet.datasets.kitti.kitti_dataset create_kitti_infos tools/cfgs/dataset_configs/kitti_dataset.yaml
+python -m pcdet.datasets.kitti.kitti_dataset create_kitti_infos tools/cfgs/dataset_configs/kitti_aug_dataset.yaml
+
+# 在KITTI上测试PV-RCNN模型/CenterPoint模型
+python test.py --cfg_file ./cfgs/kitti_models/pv_rcnn.yaml --batch_size 1 --ckpt ./ckpt/pv_rcnn_8369.pth
+python test.py --cfg_file ./cfgs/kitti_models/centerpoint.yaml --batch_size 1 --ckpt ./ckpt/checkpoint_epoch_80.pth
+python test.py --cfg_file ./cfgs/kitti_models/centerpoint_with_data_aug.yaml --batch_size 2 --ckpt ./ckpt/centerpoint_with_data_aug_checkpoint_epoch_150.pth
+
+# 在KITTI上训练CenterPoint模型
+python train.py --cfg_file ./cfgs/kitti_models/centerpoint.yaml
+python train.py --cfg_file ./cfgs/kitti_models/centerpoint_with_data_aug.yaml --ckpt_save_interval 10 --num_epochs_to_eval 80
+
+# 多GPU在KITTI上训练CenterPoint模型
+bash scripts/dist_train.sh 6 --cfg_file ./cfgs/kitti_models/centerpoint.yaml --ckpt_save_interval 10
+bash scripts/dist_train.sh 6 --cfg_file ./cfgs/kitti_models/centerpoint.yaml --ckpt_save_interval 10 --num_epochs_to_eval 80
+bash scripts/dist_train.sh 6 --cfg_file ./cfgs/kitti_models/centerpoint_with_data_aug.yaml --ckpt_save_interval 10 --num_epochs_to_eval 80
+bash scripts/dist_train.sh 6 --cfg_file ./cfgs/kitti_models/centerpoint_with_data_aug.yaml --ckpt_save_interval 10 --num_epochs_to_eval 200 --extra_tag 200_epoch_train
+
+# 使用tensorboard监控CenterPoint的训练过程
+## 使用ssh将服务器的6666端口映射到本地的7777端口，使得可以本地访问
+ssh -L 7777:localhost:6666 szy4017@10.15.198.46 -p 3322
+## 启动tensorboard服务，设置对应的logdir，和映射的端口6666
+tensorboard --logdir ./output/cfgs/kitti_models/centerpoint/default/tensorboard/ --port 6666
+tensorboard --logdir ./tensorboard_val --port 6666
+tensorboard --logdir ./tensorboard --port 6666
+## 在本地浏览器中输入 http://localhost:7777/ 可访问tensorboard
+
+# 对点云bin文件进行推理
+python demo.py --data_path ./MVP_gen/raw_pcl_000000.bin
+
+# 使用FCOS对单张图进行推理
+python image_demo.py \
+    demo_kitti.png \
+    fcos_r50_caffe_fpn_gn-head_1x_kitti.py \
+    fcos_r50_caffe_fpn_gn-head_1x_kitti_20230410_mine.pth \
+    --out-file result.png
