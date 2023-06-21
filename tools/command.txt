@@ -6,6 +6,7 @@ python -m pcdet.datasets.kitti.kitti_dataset create_kitti_infos tools/cfgs/datas
 python test.py --cfg_file ./cfgs/kitti_models/pv_rcnn.yaml --batch_size 1 --ckpt ./ckpt/pv_rcnn_8369.pth
 python test.py --cfg_file ./cfgs/kitti_models/centerpoint.yaml --batch_size 1 --ckpt ./ckpt/checkpoint_epoch_80.pth
 python test.py --cfg_file ./cfgs/kitti_models/centerpoint_with_data_aug.yaml --batch_size 2 --ckpt ./ckpt/centerpoint_with_data_aug_checkpoint_epoch_150.pth
+python test.py --cfg_file ./cfgs/kitti_models/centerpoint_with_data_aug.yaml --batch_size 2 --ckpt ./ckpt/centerpoint_with_data_aug_gt_det_checkpoint_epoch_130.pth
 
 # 在KITTI上训练CenterPoint模型
 python train.py --cfg_file ./cfgs/kitti_models/centerpoint.yaml
